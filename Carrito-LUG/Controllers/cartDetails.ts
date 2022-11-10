@@ -1,35 +1,30 @@
 import { Request, Response} from "express";
 import cartDetailsModel from "../Models/cartDetails";
-//Para poder obtener los productos de la base de datos, deberé importar el modelo de producto
+//Para poder obtener los Products de la base de datos, deberé importar el modelo de producto
 import productsModel from "../Models/products";
 import cartModel from "../Models/cart";
 
 
 const cartDetailsController = {
-        //Req tendrá la información sobre la petición HTTP del Evento
-        //Res devolverá la repuesta HTTP deseada.   
+        //Req INFORMACION QUE PONEMOS EN EL DEL POSTMAN U EN LA ESTRUCTURA DE LO BD
+        //Res RESPUESTA QUE VEMOS EN EL POSTMAN.   
     
         productsInCart: async (req: Request, res: Response) => {
             try
-            {
-                const existeCarrito = await cartModel.find()
-                if(existeCarrito)
-                {
-                //Obtener Productos
-                const buscarProductos = await cartDetailsModel.find()
-                //Se mostrará la lista de productos en el carrito
-                res.status(200).send(buscarProductos)
-                }else
-                {
-                    //Creará el carrito y se podrá operar
+            {   //BUSCA EL CARRITO
+                const productExist = await cartModel.find()
+                //SI EXISTE, BUSCA LA INFO DEL CARRITO Y LA MUESTRA
+                if(productExist){
+                const productSearch = await cartDetailsModel.find()
+                res.status(200).send(productSearch)
+                //SI NO EXISTE, LO CREA E INFORMA Q SE CREO
+                }
+                else{
                    cartCreate()
                    res.status(200).send(`Se creo un carrito.`)
-                }
-               
+                }    
             }
-            catch (error)
-            {
-                //Código de error 500
+            catch (error){
                 res.status(500).send(error)
             }
         },
@@ -56,12 +51,13 @@ const cartDetailsController = {
             try
             {
 
-                //Producto que se desea agregar, para agregar un producto se deberá escribir desde body
-                const buscarProductos = await productsModel.findOne({productName: req.body.productName});
-                const existeCarrito = await cartModel.findOne({productName: "Carrito"})
-                //-----------const existeCarrito = await cartModel.findOne({productName:  req.body.productName})
-                                    //Consultas mongoose
-                if(!existeCarrito)
+                //SE BUSCA EL PRODUCTO QUE SE QUIERE AGREGAR, QUE SE INGRESO EN EL POSTMAN
+                const productSearch = await productsModel.findOne({productName: req.body.productName});
+                //SE BUSCA QUE YA SE HAYA CREADO EL CARRITO
+                const productExist = await cartModel.findOne({productName: "Carrito"})
+                //-----------const productExist = await cartModel.findOne({productName:  req.body.productName})
+                //SI NO EXISTE, LO CREA
+                if(!productExist)
                 {
                     //-----------const newCarrito = new cartModel({productName: req.body.productName, cartDetails: [], totalPrice: 0});
                     //-----------newCarrito.save();
@@ -69,46 +65,41 @@ const cartDetailsController = {
                 }
                 
                 
-                //Revisar si existe el producto antes de agregarlo
-                if(buscarProductos?.productName && existeCarrito){
-                //OperacionesCART es la amount de productos que se quiuere tener ahora y también tendrá el price que se obtendrá de la base de datos productos
-                const OperacionesCART = {amount: req.body.amount, price: buscarProductos.price}
-                if(OperacionesCART.amount <= buscarProductos.amount ){
-                    //Si se cumple la condición, se agregará el producto y se descontará la amount de productos del model producto                   
-                    //La variable Totalprice guardará el nuevo price según la amount de productos ingresados
-                    const Totalprice = totalPrice(OperacionesCART.price, OperacionesCART.amount);
-                    //La variable Totalprice pondrá el nuevo price del producto en el carrito
-                    const addProducto = new cartDetailsModel({productName: buscarProductos?.productName, amount: req.body.amount, price: Totalprice}); 
-                    await addProducto.save();
-                    //Actualizar productos // La variable TotalStock guardará el stock total que quedo en la base de datos de Productos
-                    const freeStockInList = freeStock(OperacionesCART.amount, buscarProductos.amount);
-                    //carritoLenght obtenemos el tamaño del array
-                    const carritoLenght = existeCarrito.cartDetails.length
-                    //Para comprobar sí es 0 el Stock, sí es 0 se borrará el producto de la base de datos
+                //VE SI EXISTE EL PRODUCTO QUE SE BUSCA AGREGAR Y EL CARRITO
+                if(productSearch?.productName && productExist){
+                ///INFO GUARDA LA INFORMACION QUE SE QUIERE AGREGAR
+                const INFO = {amount: req.body.amount, price: productSearch.price}
+                //SI LA CANTIDAD QUE SE QUIERE AGREGAR ESTA DISPONIBLE, SE GUARDA EL PRODUCTO
+                if(INFO.amount <= productSearch.amount ){
+                    //NUEVO PRECIO DEL CARRITO/-  /  -/EL PRODUCTO QUE SE AGREGO AL CART/-  /  -/LA CANTIDAD QUE QUEDA DISPONIBLE           
+                    const Totalprice = totalPrice(INFO.price, INFO.amount);
+                    const newProduct = new cartDetailsModel({productName: productSearch?.productName, amount: req.body.amount, price: Totalprice}); 
+                    await newProduct.save();
+                    const freeStockInList = freeStock(INFO.amount, productSearch.amount);
+                    //SI LA CANTIDAD ES = 0, SE BORRA DE LA BD
                     if(freeStockInList == 0)
                     {
                         
-                        existeCarrito?.cartDetails.push(addProducto)
-                        existeCarrito.totalPrice = cartListPrice(existeCarrito.totalPrice, Totalprice);
-                        existeCarrito.save();
-                        buscarProductos.delete();
+                        productExist?.cartDetails.push(newProduct)
+                        productExist.totalPrice = cartListPrice(productExist.totalPrice, Totalprice);
+                        productExist.save();
+                        productSearch.delete();
                         
-                    }else{
-                        buscarProductos.amount = freeStockInList;
-                        buscarProductos.save();
-                        existeCarrito?.cartDetails.push(addProducto)
-                        existeCarrito.totalPrice = cartListPrice(existeCarrito.totalPrice, Totalprice);
-                        existeCarrito.save();
+                    }//SINO, SE ENVIA LA NUEVA CANTIDAD
+                    else{
+                        productSearch.amount = freeStockInList;
+                        productSearch.save();
+                        productExist?.cartDetails.push(newProduct)
+                        productExist.totalPrice = cartListPrice(productExist.totalPrice, Totalprice);
+                        productExist.save();
                     }                            
-                    //COndicionales para subir en array
-                    res.status(200).send(addProducto);
+                    res.status(200).send(newProduct);
                     }else
                     {
-                        res.status(400).send(`No se puede agregar el producto porque el producto ${req.body.productName}\nno tiene stock suficiente.`);
+                        res.status(400).send(`No hay stock suficiente de ${req.body.productName} para agregar.`);
                     }             
                 }else{
                     res.status(404).send(`El producto ${req.body.productName} no existe en la base de datos.`)
-                //HTTP STATUS NOT FOUND
                 }
                 
             }
@@ -119,63 +110,64 @@ const cartDetailsController = {
             
         },
 
+        
         deleteByName: async (req: Request, res: Response) => {
             try
             {
-                //Buscar el producto a eliminar del carrito con parametros
-                const BuscarProducto = await cartDetailsModel.findOne({productName: req.body.productName})
-                //Antes de eliminarlo creo también una variable que conecta con la base de datos de Producto
-                const Productos = await productsModel.findOne({productName: req.body.productName})
-                const existeCarrito = await cartModel.findOne({productName: "Carrito"})
-                //-----------const existeCarrito = await cartModel.findOne({productName: req.params.productName})
-                if(!existeCarrito)
+                //BUSCA EL PRODUCTO EN EL CARRITO POR EL NOMBRE
+                const productInCart = await cartDetailsModel.findOne({productName: req.body.productName})
+                const Products = await productsModel.findOne({productName: req.body.productName})
+                const productExist = await cartModel.findOne({productName: "Carrito"})
+                //-----------const productExist = await cartModel.findOne({productName: req.params.productName})
+                
+                if(!productExist)
                 {
                     cartCreate()
                 }
                 
-                //Este if sirve para comprobar si existe el producto deseado y también existe en la base de datos de Producto
-                if(BuscarProducto?.productName && Productos?.productName){
-                //Creo la variable del producto del carrito que se está por eliminar para devolver el stock en la base de datos de Producto
-                    const StockCarrito = {amount: BuscarProducto?.amount}
-                    //Guardo el stock que tiene almacenado la base de datos de Producto
-                    const StockProductos = {amount: Productos?.amount}
-                    //Ahora creo una variable que guardará el stock de ProductoCarrito y sumará ese Stock con el Stock de la base de datos de Producto
-                    const TotalStock = totalAmount(StockCarrito.amount, StockProductos.amount);
+                //SI EL PRODUCTO EXISTE EN LA BD DE CART Y EN LA BD DE LA LIST
+                if(productInCart?.productName && Products?.productName){
+                //SE GUARDA LA CANTIDAD DEL PRODUCTO QUE HAY EN EL CARRITO PARA MANDARLO A LA LIST
+                    const StockCarrito = {amount: productInCart?.amount}
+                    //SE GUARDA LA CANTIDAD DEL PRODUCTO QUE HAY EN LA LIST
+                    const StockProducts = {amount: Products?.amount}
+                    //GUARDA EL STOCK TOTAL (stock  Cart + Stock LIST)
+                    const TotalStock = totalAmount(StockCarrito.amount, StockProducts.amount);
                     const productoNombre = await cartDetailsModel.findOneAndDelete({productName: req.body.productName})
-                    //Una vez eliminado la base de datos, se guardará los stock sumados a la base de datos de PRODUCTOS
-                    Productos.amount = TotalStock;
+                    //Una vez eliminado la base de datos, se guardará los stock sumados a la base de datos de Products
+                    Products.amount = TotalStock;
                     
-                    if(existeCarrito && BuscarProducto.price)
+                    if(productExist && productInCart.price)
                     {
                         //Eliminar valores del array
-                        const deleteProductoArray = existeCarrito.cartDetails.filter((BuscarProducto => BuscarProducto.productName != req.body.productName))
-                        existeCarrito.cartDetails = deleteProductoArray;
-                        existeCarrito.totalPrice = existeCarrito.totalPrice - BuscarProducto.price
-                        existeCarrito.save();
+                        const deleteProductoArray = productExist.cartDetails.filter((productInCart => productInCart.productName != req.body.productName))
+                        productExist.cartDetails = deleteProductoArray;
+                        productExist.totalPrice = productExist.totalPrice - productInCart.price
+                        productExist.save();
                     }
-                    Productos.save()
-                    res.status(200).send(`El producto ${BuscarProducto.productName} se elimino con exito del carrito y \nse devolvió el stock del carrito a la base de datos de Productos`);                         
-                //Sí esta condiciíon se activa es porque existe el producto en la base de datos Carrito pero no en la base de datos Productos
-                }else if(BuscarProducto?.productName && !Productos?.productName && BuscarProducto.price) 
+                    Products.save()
+                    res.status(200).send(`El producto ${productInCart.productName} se elimino con exito del carrito y \nse devolvió el stock del carrito a la base de datos de Products`);                         
+                // SI EXISTE EN LA BD DE CART PERO NO EN LA BD DE LIST
+                }else if(productInCart?.productName && !Products?.productName && productInCart.price) 
                 {
-                    //Operaciones Matemáticas para devolver el price Original
-                    const OperacionesCART = {amount: BuscarProducto.amount, price: BuscarProducto.price}
-                    const productPrice = price(OperacionesCART.price, OperacionesCART.amount);
-                    //Volver a crear el producto en la base de datos productos
-                    const newProducto = new productsModel({productName: BuscarProducto.productName, amount: BuscarProducto.amount, price: productPrice});
+                    //SE CALCULA Y DEVUELVE EL PRECIO
+                    const INFO = {amount: productInCart.amount, price: productInCart.price}
+                    const productPrice = price(INFO.price, INFO.amount);
+                    //SE CARGA EL PRODUCTO EN LA BD DE PRODUCTO
+                    const newProducto = new productsModel({productName: productInCart.productName, amount: productInCart.amount, price: productPrice});
                     newProducto.save();
                     //Actualizar array
-                    if(existeCarrito)
+                    if(productExist)
                     {
                         //Eliminar valores del array
-                        const deleteProductoArray = existeCarrito.cartDetails.filter((BuscarProducto => BuscarProducto.productName != req.body.productName))
-                        existeCarrito.cartDetails = deleteProductoArray;
-                        existeCarrito.totalPrice = existeCarrito.totalPrice - BuscarProducto.price
-                        existeCarrito.save();
+                        const deleteProductoArray = productExist.cartDetails.filter((productInCart => productInCart.productName != req.body.productName))
+                        productExist.cartDetails = deleteProductoArray;
+                        productExist.totalPrice = productExist.totalPrice - productInCart.price
+                        productExist.save();
                     }
-                    //Ahora borrará el producto del carrito y lo devolverá a la base de datos productos
-                    BuscarProducto.delete();
-                    res.status(200).send(`El producto ${BuscarProducto.productName} se elimino con exito del carrito y \nse devolvió el stock del carrito a la base de datos de Productos`)
+                    //SE BORRA EL PRODUCTO EN EL CARRITO Y SE GUARDA EN LA BD DE LIST
+                    productInCart.delete();
+                    res.status(200).send(`El producto ${productInCart.productName} se elimino con exito del carrito y \nse devolvió el stock del carrito a la base de datos de Products`)
                 }else{
                     res.status(404).send(`El producto ${req.body.productName} no existe en la base de datos`);
                 }
@@ -187,81 +179,78 @@ const cartDetailsController = {
             }
         },
 
+
+
+
         changeAmount: async (req: Request, res: Response) => {
             try
             {
-                //Se obtendrá el producto de la base de datos del carrito
-                const obtenerProductoCART = await cartDetailsModel.findOne({productName: req.body.productName})
-                //Se obtendrá el producto de la base de datos de producto
-                const obtenerProducto = await productsModel.findOne({productName: req.body.productName})
-                //El condicional este nos dirá si existen los dos productos en sus respectivas base de datos
-                const existeCarrito = await cartModel.findOne({productName: "Carrito"})
-                //-----------const existeCarrito = await cartModel.findOne({productName: req.body.productName})
-                if(!existeCarrito)
+                //SE BUSCA EL PRODUCTO EN EL CARRITO
+                const getProductInCart = await cartDetailsModel.findOne({productName: req.body.productName})
+                //SE BUSCA EL PRODUCTO EN EL LISTADO DE PRODUCTOS
+                const getProductInList = await productsModel.findOne({productName: req.body.productName})
+                ///SE VE SI EXISTE EL CARRITO
+                const productExist = await cartModel.findOne({productName: "Carrito"})
+                //-----------const productExist = await cartModel.findOne({productName: req.body.productName})
+                if(!productExist)
                 {
                     cartCreate();
                 }
-
-                if(obtenerProductoCART && obtenerProducto)
+                //SI SE ENCUENTRA EL PRODUCTO BUSCADO EN EL CARRITO Y EN EL LISTADO
+                if(getProductInCart && getProductInList)
                 {
-                    //Obtenemos el amountTOTAL
-                    const totalStock = totalAmount(obtenerProductoCART?.amount, obtenerProducto?.amount)
-                    //Obtenemos el price del producto, no el price del producto en el carrito 
-                    const productPrice = obtenerProducto?.price;
-                    //Obtenemos la nueva amount que se quiere modificar
+                    //SE CALCUTA EL STOCK TOTAL, EL STOCK SUMADO DE TODOS LADOS (cart + list)
+                    const totalStock = totalAmount(getProductInCart?.amount, getProductInList?.amount)
+                    //SE BUSCA EL PRECIO DEL PRODUCTO
+                    const productPrice = getProductInList?.price;
+                    //LA NUEVA CANTIDAD QUE SE QUIERE INGRESAR
                     const newAmount = {amount: req.body.amount}
-                    //Obtenemos el stock restante que será devuelto a la base de datos de producto
+                    //SE SACA EL STOCK QUE QUE DA DISPONIBLE EN list (list - cart)
                     const freeStockInList = freeStock(newAmount.amount, totalStock)
-                     //Crear una variable para guardar el price antiguo
-                    const beforeCartPrice = obtenerProductoCART.price;
-                    //En el siguiente condicional, se comprobará que la amount nueva de productos no sea negativa
-                    //También si el price del producto del carrito existe y también el price del producto de la base de datos
-                    if(freeStockInList >= 0 && productPrice && existeCarrito && obtenerProductoCART && beforeCartPrice)
+                    //GUARDA EL PRECIO ANTERIOR DEL CARRITO
+                    const beforeCartPrice = getProductInCart.price;
+                    //EL STOCK QUE QUEDA EN LA BD DE LISTA SEA MAYOR O IGUAL A 0
+                    if(freeStockInList >= 0 && productPrice && productExist && getProductInCart && beforeCartPrice)
                     {
-                        
+                      //SI ES DIFERENTE A 0  
                      if(newAmount.amount != 0)
                      {
-                        //Sí stock restante es 0 se borrará el producto de la base de datos
+                        //SI EL STOCK RESTANTE ES = 0, SE BORRA EL PRODUCTO DE LA list
                         if(freeStockInList == 0)
                         {
-                            obtenerProducto?.delete();
-                        }else if(obtenerProducto?.amount != null)
+                            getProductInList?.delete();
+                        }//SINO SE GUARDA LA NUEVA CANTIDAD EN LA list
+                        else if(getProductInList?.amount != null)
                         {
-                            obtenerProducto.amount = freeStockInList
-                            obtenerProducto.save();
+                            getProductInList.amount = freeStockInList
+                            getProductInList.save();
                         }
+                        //SE ACTUALIZA LA NUEVA CANTIDAD Y EL NUEVO PRECIO DE EL CARRITO
+                        getProductInCart.amount = newAmount.amount
+                        getProductInCart.price = productPrice * newAmount.amount;
+                        getProductInCart.save();
                        
-                        obtenerProductoCART.amount = newAmount.amount
-                        obtenerProductoCART.price = productPrice * newAmount.amount;
-                        obtenerProductoCART.save();
-                        //Actualizar Array
-                        const index = existeCarrito.cartDetails.findIndex((producto) => {
-                            return producto.productName == obtenerProductoCART.productName
-                        });
-                        const updateArray = existeCarrito.cartDetails.splice(index, 1)
-                        existeCarrito.cartDetails.push(obtenerProductoCART);
-                        //Comprobar si existe solo un producto en el carritp
-                        existeCarrito.totalPrice = existeCarrito.totalPrice + obtenerProductoCART.price - beforeCartPrice 
-                        existeCarrito.save();
+                        //Comprobar si existe solo un producto en el carritO
+                        productExist.totalPrice = productExist.totalPrice + getProductInCart.price - beforeCartPrice 
+                        productExist.save();
                         res.status(200).send(`Se actualizo con exito el producto del carrito:\n* ${req.body.productName}\n* amount: ${newAmount.amount}\n\n`)
                      }
                      else
                       {
-                        if(existeCarrito && obtenerProductoCART.price)
+                        if(productExist && getProductInCart.price)
                         {
-                        //Eliminar valores del array
-                           
-                        existeCarrito.cartDetails = existeCarrito.cartDetails.filter((producto) => {
-                            return producto.productName != obtenerProductoCART.productName
+                        //ELIMINA LOS VALORES DEL ARRAY DE DETALLES Y LO GUARDA
+                        productExist.cartDetails = productExist.cartDetails.filter((producto) => {
+                            return producto.productName != getProductInCart.productName
                         })
-                        existeCarrito.totalPrice = existeCarrito.totalPrice - obtenerProductoCART.price
-                        existeCarrito.save();
+                        productExist.totalPrice = productExist.totalPrice - getProductInCart.price
+                        productExist.save();
                         }           
-                        //Se eliminará el producto del carrito sí la nueva amount es 0
-                        obtenerProducto.amount = freeStockInList;
-                        obtenerProducto.save();
-                        obtenerProductoCART.delete();
-                        res.status(200).send(`Se elimino el producto del carrito y se envió el stock restante a \nla base de datos de Productos.`)
+                        //SI LA NUEVA CANTIDAD ES 0 , SE ELIMINA EL PRODUCTO DEL CARRITO
+                        getProductInList.amount = freeStockInList;
+                        getProductInList.save();
+                        getProductInCart.delete();
+                        res.status(200).send(`Se elimino el producto del carrito y se envió el stock restante a \nla base de datos de Products.`)
                       }    
                         
                     }else
@@ -269,65 +258,59 @@ const cartDetailsController = {
                         res.status(400).send(`No hay stock suficiente.`);
                     }
                 } 
-                //El condicional este nos dirá si no existe en la base de datos carrito pero si existe el producto en la base de datos de producto     
-                if(!obtenerProductoCART && obtenerProducto)
+                //SI NO EXISTE EL PRODUCTO EN EL CARRITO PERO SI EN LA LISTA    
+                if(!getProductInCart && getProductInList)
                 {
                     res.status(400).send(`No se puede actualizar, el producto ${req.body.productName} no existe en el carrito.`)
                 }
-                // El condicional se activa si existe el producto en el carrito pero no en la base de datos de producto          
-                if(obtenerProductoCART && !obtenerProducto)
+                //SI EXISTE EL PRODUCTO EN EL CARRITO PERO NO EN LA LISTA        
+                if(getProductInCart && !getProductInList)
                 {
-                    //Obtenemos el amountTOTAL
-                    const totalStock = obtenerProductoCART.amount
-                    //Obtenemos el price del producto, no el price del producto en el carrito 
-                    const productPrice = price(obtenerProductoCART.price, totalStock)
-                    //Obtenemos la nueva amount que se quiere modificar
+                    //SE CALCUTA EL STOCK TOTAL, EL STOCK SUMADO DE TODOS LADOS (cart + list)
+                    const totalStock = getProductInCart.amount
+                    //SE BUSCA EL PRECIO DEL PRODUCTO
+                    const productPrice = price(getProductInCart.price, totalStock)
+                    //LA NUEVA CANTIDAD QUE SE QUIERE INGRESAR
                     const newAmount = {amount: req.body.amount}
-                    //Obtenemos el stock restante que será devuelto a la base de datos de producto
+                    //SE SACA EL STOCK QUE QUE DA DISPONIBLE EN list (list - cart)
                     const freeStockInList = freeStock(newAmount.amount, totalStock)
-                    const beforeCartPrice = obtenerProductoCART.price;
-                    //En el siguiente condicional, se comprobará que la amount nueva de productos no sea negativa ni 0
-                    //También si el price del producto del carrito existe y también el price del producto de la base de datos
+                    //GUARDA EL PRECIO ANTERIOR DEL CARRITO
+                    const beforeCartPrice = getProductInCart.price;
+                    //SI EL STOCK QUE HAY EN LA LISTA ES MAYOR A 0
                     if(freeStockInList > 0)
                     {
-                        //Sí la nueva amount es 0, entonces se borrará el producto de la base de datos y se devolverá todo sus valores a la base de datos productos
-                        if(newAmount.amount == 0 && existeCarrito && obtenerProductoCART.price)
+                        //SI LA NUEVA CANTIDAD ES 0, SE BORRA EL PRODUCTO DEL CARRITO Y SE SUMA A LA BD DE LISTA
+                        if(newAmount.amount == 0 && productExist && getProductInCart.price)
                         {
-                            const createProduct = new productsModel({productName: obtenerProductoCART.productName, amount: freeStockInList, price: productPrice})
+                            const createProduct = new productsModel({productName: getProductInCart.productName, amount: freeStockInList, price: productPrice})
                             createProduct.save();
-                           //Eliminar valores del array
-                            existeCarrito.cartDetails = existeCarrito.cartDetails.filter((producto) => {
-                            return producto.productName != obtenerProductoCART.productName
+                           //ELIMINA EL ARRAY DE DETAILS
+                            productExist.cartDetails = productExist.cartDetails.filter((producto) => {
+                            return producto.productName != getProductInCart.productName
                             })
-                            existeCarrito.totalPrice = existeCarrito.totalPrice - obtenerProductoCART.price
-                            existeCarrito.save();
-                            obtenerProductoCART.delete();
-                            res.status(200).send(`Se elimino el producto ${req.body.productName} del carrito \ny se devolvió el stock a la base de datos Productos.`)
+                            productExist.totalPrice = productExist.totalPrice - getProductInCart.price
+                            productExist.save();
+                            getProductInCart.delete();
+                            res.status(200).send(`Se elimino el producto ${req.body.productName} del carrito \ny se devolvió el stock a la base de datos Products.`)
                         } 
-                        if (newAmount.amount > 0 && existeCarrito && obtenerProductoCART.price && beforeCartPrice)
+                        if (newAmount.amount > 0 && productExist && getProductInCart.price && beforeCartPrice)
                         {
-                            const createProduct = new productsModel({productName: obtenerProductoCART.productName, amount: freeStockInList, price: productPrice})
-                            obtenerProductoCART.amount = newAmount.amount
-                            obtenerProductoCART.price = totalPrice(productPrice, newAmount.amount)
+                            const createProduct = new productsModel({productName: getProductInCart.productName, amount: freeStockInList, price: productPrice})
+                            getProductInCart.amount = newAmount.amount
+                            getProductInCart.price = totalPrice(productPrice, newAmount.amount)
                             createProduct.save();
-                            obtenerProductoCART.save();
-                            //Actualizar Array
-                            const index = existeCarrito.cartDetails.findIndex((producto) => {
-                                return producto.productName == obtenerProductoCART.productName
-                                });
-                                const updateArray = existeCarrito.cartDetails.splice(index, 1)
-                                existeCarrito.cartDetails.push(obtenerProductoCART);
-                                //Comprobar si existe solo un producto en el carritp
-                                existeCarrito.totalPrice = existeCarrito.totalPrice + obtenerProductoCART.price - beforeCartPrice 
-                                existeCarrito.save();
-                            res.status(200).send(`Se actualizo con exito el producto del carrito:\n* Producto: ${obtenerProductoCART.productName}\n* Nueva amount: ${obtenerProductoCART.amount}\n* Nuevo price: ${obtenerProductoCART.price}\n\nSe devolvió a la base de datos producto:\n* Producto: ${req.body.productName}\n* Stock devuelto: ${freeStockInList}`)
+                            getProductInCart.save();
+                                productExist.cartDetails.push(getProductInCart);
+                                productExist.totalPrice = productExist.totalPrice + getProductInCart.price - beforeCartPrice 
+                                productExist.save();
+                            res.status(200).send(`Se actualizo con exito el producto del carrito:\n* Producto: ${getProductInCart.productName}\n* Nueva amount: ${getProductInCart.amount}\n* Nuevo price: ${getProductInCart.price}\n\nSe devolvió a la base de datos producto:\n* Producto: ${req.body.productName}\n* Stock devuelto: ${freeStockInList}`)
                         }                       
                     }else
                     {
-                        res.status(400).send(`No se pudo actualizar, debido a que supero la amount de stock, el stock total del producto ${obtenerProductoCART.productName} es de: ${obtenerProductoCART.amount}`)
+                        res.status(400).send(`No se pudo actualizar, debido a que supero la amount de stock, el stock total del producto ${getProductInCart.productName} es de: ${getProductInCart.amount}`)
                     }
                 }
-                if(!obtenerProductoCART && !obtenerProducto)
+                if(!getProductInCart && !getProductInList)
                 {
                     res.status(400).send(`El producto ${req.body.productName} no existe.`)
                 }
@@ -381,32 +364,32 @@ const cartDetailsController = {
             try
             {
                 //Se obtendrá el producto de la base de datos del carrito
-                const obtenerProductoCART = await cartDetailsModel.findOne({productName: req.body.productName})
+                const getProductInCart = await cartDetailsModel.findOne({productName: req.body.productName})
                 //Se obtendrá el producto de la base de datos de producto
-                const obtenerProducto = await productsModel.findOne({productName: req.body.productName})
-                //El condicional este nos dirá si existen los dos productos en sus respectivas base de datos
-                const existeCarrito = await cartModel.findOne({productName: "Carrito"})
-                //-----------const existeCarrito = await cartModel.findOne({productName: req.body.productName})
-                if(!existeCarrito)
+                const getProductInList = await productsModel.findOne({productName: req.body.productName})
+                //El condicional este nos dirá si existen los dos Products en sus respectivas base de datos
+                const productExist = await cartModel.findOne({productName: "Carrito"})
+                //-----------const productExist = await cartModel.findOne({productName: req.body.productName})
+                if(!productExist)
                 {
                     cartCreate();
                 }
 
-                if(obtenerProductoCART && obtenerProducto)
+                if(getProductInCart && getProductInList)
                 {
                     //Obtenemos el amountTOTAL
-                    const totalStock = totalAmount(obtenerProductoCART?.amount, obtenerProducto?.amount)
+                    const totalStock = totalAmount(getProductInCart?.amount, getProductInList?.amount)
                     //Obtenemos el price del producto, no el price del producto en el carrito 
-                    const productPrice = obtenerProducto?.price;
+                    const productPrice = getProductInList?.price;
                     //Obtenemos la nueva amount que se quiere modificar
-                    const newAmount = obtenerProductoCART.amount + 1;
+                    const newAmount = getProductInCart.amount + 1;
                     //Obtenemos el stock restante que será devuelto a la base de datos de producto
                     const freeStockInList = freeStock(newAmount, totalStock)
                      //Crear una variable para guardar el price antiguo
-                    const beforeCartPrice = obtenerProductoCART.price;
-                    //En el siguiente condicional, se comprobará que la amount nueva de productos no sea negativa
+                    const beforeCartPrice = getProductInCart.price;
+                    //En el siguiente condicional, se comprobará que la amount nueva de Products no sea negativa
                     //También si el price del producto del carrito existe y también el price del producto de la base de datos
-                    if(freeStockInList >= 0 && productPrice && existeCarrito && obtenerProductoCART && beforeCartPrice)
+                    if(freeStockInList >= 0 && productPrice && productExist && getProductInCart && beforeCartPrice)
                     {
                         
                      if(newAmount != 0)
@@ -414,44 +397,44 @@ const cartDetailsController = {
                         //Sí stock restante es 0 se borrará el producto de la base de datos
                         if(freeStockInList == 0)
                         {
-                            obtenerProducto?.delete();
-                        }else if(obtenerProducto?.amount != null)
+                            getProductInList?.delete();
+                        }else if(getProductInList?.amount != null)
                         {
-                            obtenerProducto.amount = freeStockInList
-                            obtenerProducto.save();
+                            getProductInList.amount = freeStockInList
+                            getProductInList.save();
                         }
                        
-                        obtenerProductoCART.amount = newAmount
-                        obtenerProductoCART.price = productPrice * newAmount;
-                        obtenerProductoCART.save();
+                        getProductInCart.amount = newAmount
+                        getProductInCart.price = productPrice * newAmount;
+                        getProductInCart.save();
                         //Actualizar Array
-                        const index = existeCarrito.cartDetails.findIndex((producto) => {
-                            return producto.productName == obtenerProductoCART.productName
+                        const index = productExist.cartDetails.findIndex((producto) => {
+                            return producto.productName == getProductInCart.productName
                         });
-                        const updateArray = existeCarrito.cartDetails.splice(index, 1)
-                        existeCarrito.cartDetails.push(obtenerProductoCART);
+                        const updateArray = productExist.cartDetails.splice(index, 1)
+                        productExist.cartDetails.push(getProductInCart);
                         //Comprobar si existe solo un producto en el carritp
-                        existeCarrito.totalPrice = existeCarrito.totalPrice + obtenerProductoCART.price - beforeCartPrice 
-                        existeCarrito.save();
+                        productExist.totalPrice = productExist.totalPrice + getProductInCart.price - beforeCartPrice 
+                        productExist.save();
                         res.status(200).send(`Se actualizo con exito el producto del carrito:\n* ${req.body.productName}\n* amount: ${newAmount}\n\n`)
                      }
                      else
                       {
-                        if(existeCarrito && obtenerProductoCART.price)
+                        if(productExist && getProductInCart.price)
                         {
                         //Eliminar valores del array
                            
-                        existeCarrito.cartDetails = existeCarrito.cartDetails.filter((producto) => {
-                            return producto.productName != obtenerProductoCART.productName
+                        productExist.cartDetails = productExist.cartDetails.filter((producto) => {
+                            return producto.productName != getProductInCart.productName
                         })
-                        existeCarrito.totalPrice = existeCarrito.totalPrice - obtenerProductoCART.price
-                        existeCarrito.save();
+                        productExist.totalPrice = productExist.totalPrice - getProductInCart.price
+                        productExist.save();
                         }           
                         //Se eliminará el producto del carrito sí la nueva amount es 0
-                        obtenerProducto.amount = freeStockInList;
-                        obtenerProducto.save();
-                        obtenerProductoCART.delete();
-                        res.status(200).send(`Se elimino el producto del carrito y se envió el stock restante a \nla base de datos de Productos.`)
+                        getProductInList.amount = freeStockInList;
+                        getProductInList.save();
+                        getProductInCart.delete();
+                        res.status(200).send(`Se elimino el producto del carrito y se envió el stock restante a \nla base de datos de Products.`)
                       }    
                         
                     }else
@@ -460,64 +443,64 @@ const cartDetailsController = {
                     }
                 } 
                 //El condicional este nos dirá si no existe en la base de datos carrito pero si existe el producto en la base de datos de producto     
-                if(!obtenerProductoCART && obtenerProducto)
+                if(!getProductInCart && getProductInList)
                 {
                     res.status(400).send(`No se puede actualizar, el producto ${req.body.productName} no existe en el carrito.`)
                 }
                 // El condicional se activa si existe el producto en el carrito pero no en la base de datos de producto          
-                if(obtenerProductoCART && !obtenerProducto)
+                if(getProductInCart && !getProductInList)
                 {
                     //Obtenemos el amountTOTAL
-                    const totalStock = obtenerProductoCART.amount
+                    const totalStock = getProductInCart.amount
                     //Obtenemos el price del producto, no el price del producto en el carrito 
-                    const productPrice = price(obtenerProductoCART.price, totalStock)
+                    const productPrice = price(getProductInCart.price, totalStock)
                     //Obtenemos la nueva amount que se quiere modificar
                     const newAmount = {amount: req.body.amount}
                     //Obtenemos el stock restante que será devuelto a la base de datos de producto
                     const freeStockInList = freeStock(newAmount.amount, totalStock)
-                    const beforeCartPrice = obtenerProductoCART.price;
-                    //En el siguiente condicional, se comprobará que la amount nueva de productos no sea negativa ni 0
+                    const beforeCartPrice = getProductInCart.price;
+                    //En el siguiente condicional, se comprobará que la amount nueva de Products no sea negativa ni 0
                     //También si el price del producto del carrito existe y también el price del producto de la base de datos
                     if(freeStockInList > 0)
                     {
-                        //Sí la nueva amount es 0, entonces se borrará el producto de la base de datos y se devolverá todo sus valores a la base de datos productos
-                        if(newAmount.amount == 0 && existeCarrito && obtenerProductoCART.price)
+                        //Sí la nueva amount es 0, entonces se borrará el producto de la base de datos y se devolverá todo sus valores a la base de datos Products
+                        if(newAmount.amount == 0 && productExist && getProductInCart.price)
                         {
-                            const createProduct = new productsModel({productName: obtenerProductoCART.productName, amount: freeStockInList, price: productPrice})
+                            const createProduct = new productsModel({productName: getProductInCart.productName, amount: freeStockInList, price: productPrice})
                             createProduct.save();
                            //Eliminar valores del array
-                            existeCarrito.cartDetails = existeCarrito.cartDetails.filter((producto) => {
-                            return producto.productName != obtenerProductoCART.productName
+                            productExist.cartDetails = productExist.cartDetails.filter((producto) => {
+                            return producto.productName != getProductInCart.productName
                             })
-                            existeCarrito.totalPrice = existeCarrito.totalPrice - obtenerProductoCART.price
-                            existeCarrito.save();
-                            obtenerProductoCART.delete();
-                            res.status(200).send(`Se elimino el producto ${req.body.productName} del carrito \ny se devolvió el stock a la base de datos Productos.`)
+                            productExist.totalPrice = productExist.totalPrice - getProductInCart.price
+                            productExist.save();
+                            getProductInCart.delete();
+                            res.status(200).send(`Se elimino el producto ${req.body.productName} del carrito \ny se devolvió el stock a la base de datos Products.`)
                         } 
-                        if (newAmount.amount > 0 && existeCarrito && obtenerProductoCART.price && beforeCartPrice)
+                        if (newAmount.amount > 0 && productExist && getProductInCart.price && beforeCartPrice)
                         {
-                            const createProduct = new productsModel({productName: obtenerProductoCART.productName, amount: freeStockInList, price: productPrice})
-                            obtenerProductoCART.amount = newAmount.amount
-                            obtenerProductoCART.price = totalPrice(productPrice, newAmount.amount)
+                            const createProduct = new productsModel({productName: getProductInCart.productName, amount: freeStockInList, price: productPrice})
+                            getProductInCart.amount = newAmount.amount
+                            getProductInCart.price = totalPrice(productPrice, newAmount.amount)
                             createProduct.save();
-                            obtenerProductoCART.save();
+                            getProductInCart.save();
                             //Actualizar Array
-                            const index = existeCarrito.cartDetails.findIndex((producto) => {
-                                return producto.productName == obtenerProductoCART.productName
+                            const index = productExist.cartDetails.findIndex((producto) => {
+                                return producto.productName == getProductInCart.productName
                                 });
-                                const updateArray = existeCarrito.cartDetails.splice(index, 1)
-                                existeCarrito.cartDetails.push(obtenerProductoCART);
+                                const updateArray = productExist.cartDetails.splice(index, 1)
+                                productExist.cartDetails.push(getProductInCart);
                                 //Comprobar si existe solo un producto en el carritp
-                                existeCarrito.totalPrice = existeCarrito.totalPrice + obtenerProductoCART.price - beforeCartPrice 
-                                existeCarrito.save();
-                            res.status(200).send(`Se actualizo con exito el producto del carrito:\n* Producto: ${obtenerProductoCART.productName}\n* Nueva amount: ${obtenerProductoCART.amount}\n* Nuevo price: ${obtenerProductoCART.price}\n\nSe devolvió a la base de datos producto:\n* Producto: ${req.body.productName}\n* Stock devuelto: ${freeStockInList}`)
+                                productExist.totalPrice = productExist.totalPrice + getProductInCart.price - beforeCartPrice 
+                                productExist.save();
+                            res.status(200).send(`Se actualizo con exito el producto del carrito:\n* Producto: ${getProductInCart.productName}\n* Nueva amount: ${getProductInCart.amount}\n* Nuevo price: ${getProductInCart.price}\n\nSe devolvió a la base de datos producto:\n* Producto: ${req.body.productName}\n* Stock devuelto: ${freeStockInList}`)
                         }                       
                     }else
                     {
-                        res.status(400).send(`No se pudo actualizar, debido a que supero la amount de stock, el stock total del producto ${obtenerProductoCART.productName} es de: ${obtenerProductoCART.amount}`)
+                        res.status(400).send(`No se pudo actualizar, debido a que supero la amount de stock, el stock total del producto ${getProductInCart.productName} es de: ${getProductInCart.amount}`)
                     }
                 }
-                if(!obtenerProductoCART && !obtenerProducto)
+                if(!getProductInCart && !getProductInList)
                 {
                     res.status(400).send(`El producto ${req.body.productName} no existe.`)
                 }
@@ -545,32 +528,32 @@ const cartDetailsController = {
             try
             {
                 //Se obtendrá el producto de la base de datos del carrito
-                const obtenerProductoCART = await cartDetailsModel.findOne({productName: req.body.productName})
+                const getProductInCart = await cartDetailsModel.findOne({productName: req.body.productName})
                 //Se obtendrá el producto de la base de datos de producto
-                const obtenerProducto = await productsModel.findOne({productName: req.body.productName})
-                //El condicional este nos dirá si existen los dos productos en sus respectivas base de datos
-                const existeCarrito = await cartModel.findOne({productName: "Carrito"})
-                //-----------const existeCarrito = await cartModel.findOne({productName: req.body.productName})
-                if(!existeCarrito)
+                const getProductInList = await productsModel.findOne({productName: req.body.productName})
+                //El condicional este nos dirá si existen los dos Products en sus respectivas base de datos
+                const productExist = await cartModel.findOne({productName: "Carrito"})
+                //-----------const productExist = await cartModel.findOne({productName: req.body.productName})
+                if(!productExist)
                 {
                     cartCreate();
                 }
 
-                if(obtenerProductoCART && obtenerProducto)
+                if(getProductInCart && getProductInList)
                 {
                     //Obtenemos el amountTOTAL
-                    const totalStock = totalAmount(obtenerProductoCART?.amount, obtenerProducto?.amount)
+                    const totalStock = totalAmount(getProductInCart?.amount, getProductInList?.amount)
                     //Obtenemos el price del producto, no el price del producto en el carrito 
-                    const productPrice = obtenerProducto?.price;
+                    const productPrice = getProductInList?.price;
                     //Obtenemos la nueva amount que se quiere modificar
-                    const newAmount = obtenerProductoCART.amount - 1;
+                    const newAmount = getProductInCart.amount - 1;
                     //Obtenemos el stock restante que será devuelto a la base de datos de producto
                     const freeStockInList = freeStock(newAmount, totalStock)
                      //Crear una variable para guardar el price antiguo
-                    const beforeCartPrice = obtenerProductoCART.price;
-                    //En el siguiente condicional, se comprobará que la amount nueva de productos no sea negativa
+                    const beforeCartPrice = getProductInCart.price;
+                    //En el siguiente condicional, se comprobará que la amount nueva de Products no sea negativa
                     //También si el price del producto del carrito existe y también el price del producto de la base de datos
-                    if(freeStockInList >= 0 && productPrice && existeCarrito && obtenerProductoCART && beforeCartPrice)
+                    if(freeStockInList >= 0 && productPrice && productExist && getProductInCart && beforeCartPrice)
                     {
                         
                      if(newAmount != 0)
@@ -578,44 +561,44 @@ const cartDetailsController = {
                         //Sí stock restante es 0 se borrará el producto de la base de datos
                         if(newAmount == 0)
                         {
-                            obtenerProducto?.delete();
-                        }else if(obtenerProducto?.amount != null)
+                            getProductInList?.delete();
+                        }else if(getProductInList?.amount != null)
                         {
-                            obtenerProducto.amount = freeStockInList
-                            obtenerProducto.save();
+                            getProductInList.amount = freeStockInList
+                            getProductInList.save();
                         }
                        
-                        obtenerProductoCART.amount = newAmount
-                        obtenerProductoCART.price = productPrice * newAmount;
-                        obtenerProductoCART.save();
+                        getProductInCart.amount = newAmount
+                        getProductInCart.price = productPrice * newAmount;
+                        getProductInCart.save();
                         //Actualizar Array
-                        const index = existeCarrito.cartDetails.findIndex((producto) => {
-                            return producto.productName == obtenerProductoCART.productName
+                        const index = productExist.cartDetails.findIndex((producto) => {
+                            return producto.productName == getProductInCart.productName
                         });
-                        const updateArray = existeCarrito.cartDetails.splice(index, 1)
-                        existeCarrito.cartDetails.push(obtenerProductoCART);
+                        const updateArray = productExist.cartDetails.splice(index, 1)
+                        productExist.cartDetails.push(getProductInCart);
                         //Comprobar si existe solo un producto en el carritp
-                        existeCarrito.totalPrice = existeCarrito.totalPrice + obtenerProductoCART.price - beforeCartPrice 
-                        existeCarrito.save();
+                        productExist.totalPrice = productExist.totalPrice + getProductInCart.price - beforeCartPrice 
+                        productExist.save();
                         res.status(200).send(`Se actualizo con exito el producto del carrito:\n* ${req.body.productName}\n* amount: ${newAmount}\n\n`)
                      }
                      else
                       {
-                        if(existeCarrito && obtenerProductoCART.price)
+                        if(productExist && getProductInCart.price)
                         {
                         //Eliminar valores del array
                            
-                        existeCarrito.cartDetails = existeCarrito.cartDetails.filter((producto) => {
-                            return producto.productName != obtenerProductoCART.productName
+                        productExist.cartDetails = productExist.cartDetails.filter((producto) => {
+                            return producto.productName != getProductInCart.productName
                         })
-                        existeCarrito.totalPrice = existeCarrito.totalPrice - obtenerProductoCART.price
-                        existeCarrito.save();
+                        productExist.totalPrice = productExist.totalPrice - getProductInCart.price
+                        productExist.save();
                         }           
                         //Se eliminará el producto del carrito sí la nueva amount es 0
-                        obtenerProducto.amount = freeStockInList;
-                        obtenerProducto.save();
-                        obtenerProductoCART.delete();
-                        res.status(200).send(`Se elimino el producto del carrito y se envió el stock restante a \nla base de datos de Productos.`)
+                        getProductInList.amount = freeStockInList;
+                        getProductInList.save();
+                        getProductInCart.delete();
+                        res.status(200).send(`Se elimino el producto del carrito y se envió el stock restante a \nla base de datos de Products.`)
                       }    
                         
                     }else
@@ -624,64 +607,64 @@ const cartDetailsController = {
                     }
                 } 
                 //El condicional este nos dirá si no existe en la base de datos carrito pero si existe el producto en la base de datos de producto     
-                if(!obtenerProductoCART && obtenerProducto)
+                if(!getProductInCart && getProductInList)
                 {
                     res.status(400).send(`No se puede actualizar, el producto ${req.body.productName} no existe en el carrito.`)
                 }
                 // El condicional se activa si existe el producto en el carrito pero no en la base de datos de producto          
-                if(obtenerProductoCART && !obtenerProducto)
+                if(getProductInCart && !getProductInList)
                 {
                     //Obtenemos el amountTOTAL
-                    const totalStock = obtenerProductoCART.amount
+                    const totalStock = getProductInCart.amount
                     //Obtenemos el price del producto, no el price del producto en el carrito 
-                    const productPrice = price(obtenerProductoCART.price, totalStock)
+                    const productPrice = price(getProductInCart.price, totalStock)
                     //Obtenemos la nueva amount que se quiere modificar
                     const newAmount = {amount: req.body.amount}
                     //Obtenemos el stock restante que será devuelto a la base de datos de producto
                     const freeStockInList = freeStock(newAmount.amount, totalStock)
-                    const beforeCartPrice = obtenerProductoCART.price;
-                    //En el siguiente condicional, se comprobará que la amount nueva de productos no sea negativa ni 0
+                    const beforeCartPrice = getProductInCart.price;
+                    //En el siguiente condicional, se comprobará que la amount nueva de Products no sea negativa ni 0
                     //También si el price del producto del carrito existe y también el price del producto de la base de datos
                     if(freeStockInList > 0)
                     {
-                        //Sí la nueva amount es 0, entonces se borrará el producto de la base de datos y se devolverá todo sus valores a la base de datos productos
-                        if(newAmount.amount == 0 && existeCarrito && obtenerProductoCART.price)
+                        //Sí la nueva amount es 0, entonces se borrará el producto de la base de datos y se devolverá todo sus valores a la base de datos Products
+                        if(newAmount.amount == 0 && productExist && getProductInCart.price)
                         {
-                            const createProduct = new productsModel({productName: obtenerProductoCART.productName, amount: freeStockInList, price: productPrice})
+                            const createProduct = new productsModel({productName: getProductInCart.productName, amount: freeStockInList, price: productPrice})
                             createProduct.save();
                            //Eliminar valores del array
-                            existeCarrito.cartDetails = existeCarrito.cartDetails.filter((producto) => {
-                            return producto.productName != obtenerProductoCART.productName
+                            productExist.cartDetails = productExist.cartDetails.filter((producto) => {
+                            return producto.productName != getProductInCart.productName
                             })
-                            existeCarrito.totalPrice = existeCarrito.totalPrice - obtenerProductoCART.price
-                            existeCarrito.save();
-                            obtenerProductoCART.delete();
-                            res.status(200).send(`Se elimino el producto ${req.body.productName} del carrito \ny se devolvió el stock a la base de datos Productos.`)
+                            productExist.totalPrice = productExist.totalPrice - getProductInCart.price
+                            productExist.save();
+                            getProductInCart.delete();
+                            res.status(200).send(`Se elimino el producto ${req.body.productName} del carrito \ny se devolvió el stock a la base de datos Products.`)
                         } 
-                        if (newAmount.amount > 0 && existeCarrito && obtenerProductoCART.price && beforeCartPrice)
+                        if (newAmount.amount > 0 && productExist && getProductInCart.price && beforeCartPrice)
                         {
-                            const createProduct = new productsModel({productName: obtenerProductoCART.productName, amount: freeStockInList, price: productPrice})
-                            obtenerProductoCART.amount = newAmount.amount
-                            obtenerProductoCART.price = totalPrice(productPrice, newAmount.amount)
+                            const createProduct = new productsModel({productName: getProductInCart.productName, amount: freeStockInList, price: productPrice})
+                            getProductInCart.amount = newAmount.amount
+                            getProductInCart.price = totalPrice(productPrice, newAmount.amount)
                             createProduct.save();
-                            obtenerProductoCART.save();
+                            getProductInCart.save();
                             //Actualizar Array
-                            const index = existeCarrito.cartDetails.findIndex((producto) => {
-                                return producto.productName == obtenerProductoCART.productName
+                            const index = productExist.cartDetails.findIndex((producto) => {
+                                return producto.productName == getProductInCart.productName
                                 });
-                                const updateArray = existeCarrito.cartDetails.splice(index, 1)
-                                existeCarrito.cartDetails.push(obtenerProductoCART);
+                                const updateArray = productExist.cartDetails.splice(index, 1)
+                                productExist.cartDetails.push(getProductInCart);
                                 //Comprobar si existe solo un producto en el carritp
-                                existeCarrito.totalPrice = existeCarrito.totalPrice + obtenerProductoCART.price - beforeCartPrice 
-                                existeCarrito.save();
-                            res.status(200).send(`Se actualizo con exito el producto del carrito:\n* Producto: ${obtenerProductoCART.productName}\n* Nueva amount: ${obtenerProductoCART.amount}\n* Nuevo price: ${obtenerProductoCART.price}\n\nSe devolvió a la base de datos producto:\n* Producto: ${req.body.productName}\n* Stock devuelto: ${freeStockInList}`)
+                                productExist.totalPrice = productExist.totalPrice + getProductInCart.price - beforeCartPrice 
+                                productExist.save();
+                            res.status(200).send(`Se actualizo con exito el producto del carrito:\n* Producto: ${getProductInCart.productName}\n* Nueva amount: ${getProductInCart.amount}\n* Nuevo price: ${getProductInCart.price}\n\nSe devolvió a la base de datos producto:\n* Producto: ${req.body.productName}\n* Stock devuelto: ${freeStockInList}`)
                         }                       
                     }else
                     {
-                        res.status(400).send(`No se pudo actualizar, debido a que supero la amount de stock, el stock total del producto ${obtenerProductoCART.productName} es de: ${obtenerProductoCART.amount}`)
+                        res.status(400).send(`No se pudo actualizar, debido a que supero la amount de stock, el stock total del producto ${getProductInCart.productName} es de: ${getProductInCart.amount}`)
                     }
                 }
-                if(!obtenerProductoCART && !obtenerProducto)
+                if(!getProductInCart && !getProductInList)
                 {
                     res.status(400).send(`El producto ${req.body.productName} no existe.`)
                 }

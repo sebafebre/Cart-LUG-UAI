@@ -3,33 +3,30 @@ import productsModel from "../Models/products";
 
 //Controladora de Productos
 const productController = {
-    //Req tendrá la información sobre la petición HTTP del Evento
-    //Res devolverá la repuesta HTTP deseada.
     
+    //MUESTRA TODOS LOS PRODUCTOS EN LA BD
     allProducts: async (req: Request, res: Response) => {
         try
-        {
-            //Obtener Productos
-            const buscarProductos = await productsModel.find()
-            res.status(200).send(buscarProductos)
+        { //BUSCA LOS PRODUCTOS Y LOS MUESTRA
+            const productSearch = await productsModel.find()
+            res.status(200).send(productSearch)
         }
         catch (error)
         {
-            //Código de error 500
             res.status(500).send(error)
         }
     },
 
-    //Getunique es utilizado para buscar un producto en especifico
+    //MUESTRA UN PRODUCTO DE LA BD POR SU NOMBRE
     productByName: async (req: Request, res: Response) => {
         try
         {
-            const buscarProductosUnique = await productsModel.findOne({... req.params})
+            const productSearchUnique = await productsModel.findOne({... req.params})
             
             //Sí el producto no existe la API mandará un HTTP STATUS NOT FOUND
-            if(buscarProductosUnique?.productName != undefined)
+            if(productSearchUnique?.productName != undefined)
             {
-                res.status(200).send(buscarProductosUnique)
+                res.status(200).send(productSearchUnique)
             }else{
                 res.status(404).send(`El producto escrito en los parametros no existe en la base de datos.`);
             }
@@ -40,22 +37,23 @@ const productController = {
         }
     },
 
-    //Para agregar productos
+    //AGREGA UN PRODUCTO A LA LIST
     newProduct: async (req: Request, res: Response) => {
         try 
         {
-             //Aquí se programó para que se escriba en el body todo los datos deseados para agregar
-            const existeProductos = await productsModel.findOne({productName: req.body.productName})
-            if(existeProductos){
-                //Solicitud Incorrecta HTTP STATUS 400, Server no procesa una solicitud por algo ya existente
-                res.status(400).send(`El producto ${existeProductos.productName} ya se encuentra en la base de datos`)
+             
+            const productExist = await productsModel.findOne({productName: req.body.productName})
+            if(productExist){
+                //EL PRODUCTO YA ESTA EN LA BD
+                res.status(400).send(`El producto ${productExist.productName} ya se encuentra en la base de datos`)
             }else
             {
-                const addProducto = new productsModel({... req.body})
-                if(addProducto.amount > 0 && addProducto.productName != "" && addProducto.price >= 0)
+                const newProduct = new productsModel({... req.body})
+                // SE GUARDA CON LAS VALIDACIONES
+                if(newProduct.amount > 0 && newProduct.productName != "" && newProduct.price >= 0)
                 {
-                await addProducto.save()
-                res.status(200).send(addProducto)
+                await newProduct.save()
+                res.status(200).send(newProduct)
                 }else
                 {
                     //BAD REQUEST 
@@ -68,22 +66,20 @@ const productController = {
         }
     },
 
-    //Para eliminar los productos
+    //ELIMINA UN PRODUCTO POR SU NOMBRE
     deleteByName: async (req: Request, res: Response) => {
         try
         {
             //Aquí se programó para que sólo se escriba el parametro que se desea eliminar
-            const BuscarProducto = await productsModel.findOne({... req.params})
+            const productExist = await productsModel.findOne({... req.params})
             //Revisará sí existe el producto deseado
-            if(BuscarProducto?.productName != undefined || BuscarProducto?.productName != null){
+            if(productExist?.productName != undefined || productExist?.productName != null){
                 const productoNombre = await productsModel.findOneAndDelete({... req.params});
                 res.status(200).send(`Se elimino ${productoNombre?.productName} y sus respectivos valores de la base de datos.`);
             }
             else
             {
-                res.status(404).send(`El producto ${req.params.productName} no existe en la base de datos.`)
-                //HTTP STATUS NOT FOUND
-                
+                res.status(404).send(`El producto ${req.params.productName} no existe en la base de datos.`) 
             }
         }
         catch(error)
